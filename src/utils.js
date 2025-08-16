@@ -1,0 +1,1 @@
+export const convertpathToUri = (path) => `file://${path}`;

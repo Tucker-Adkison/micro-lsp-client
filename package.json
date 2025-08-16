@@ -1,0 +1,20 @@
+{
+  "name": "micro-lsp",
+  "version": "1.0.0",
+  "description": "Language server client for the micro text editor",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type": "module",
+  "author": "Tucker Adkison",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.0.0",
+    "postject": "^1.0.0-alpha.6"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.9"
+  }
+}
