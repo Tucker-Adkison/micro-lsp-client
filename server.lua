@@ -4,7 +4,7 @@ local micro = import("micro")
 
 local go_os = import("os")
 local home, _ = go_os.UserHomeDir()
-local pluginPath = home .. '/.config/micro/plug/lsp/'
+local pluginPath = home .. '/.config/micro/plug/lspClient/'
 local server = nil
 
 local function sendMessage(method, params)

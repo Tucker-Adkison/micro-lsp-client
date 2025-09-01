@@ -2,7 +2,7 @@ local micro = import("micro")
 local buffer = import("micro/buffer")
 local go_os = import("os")
 local home, _ = go_os.UserHomeDir()
-local pluginPath = home .. '/.config/micro/plug/lsp/'
+local pluginPath = home .. '/.config/micro/plug/lspClient/'
 package.path = package.path .. ";" .. pluginPath .. "?.lua"
 local json = require"json"
 
@@ -75,7 +75,7 @@ function Completion:autoComplete()
 
         micro.Log('New text before cleaning ', text_edit['newText'])
 
-        local new_text =  string.gsub(text_edit['newText'], "%${[%d:]+}", "")
+        local new_text =  string.gsub(text_edit['newText'], "%${%d+:[^}]-}", "")
         local start_loc = buffer.Loc(range_start['character'], range_start['line'])
         local end_loc = buffer.Loc(range_end['character'], range_end['line'])
 
