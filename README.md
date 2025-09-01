@@ -1,5 +1,3 @@
-a
-
 # LSP Plugin for Micro Text Editor
 
 A Language Server Protocol (LSP) client plugin for the [micro text editor](https://micro-editor.github.io/) that provides intelligent code completion and language features.
@@ -22,7 +20,7 @@ To install this plugin, run the following command from your CLI
 
 ```bash
 
-`$ micro -plugin install lsp-client`
+$ micro -plugin install lspClient
 
 ```
 
