@@ -54,31 +54,24 @@ local closeDropdownMenu = function()
 	end
 end
 
-local arrowKeyCommands = function(direction)
+local arrowKeyCommands = function()
     if side_view ~= nil then
         if micro.CurPane() ~= side_view then
-            if direction == 'up' then
-                micro.CurPane().Cursor:Down()
-            else
-                micro.CurPane().Cursor:Up()
-            end
-
             micro.CurPane():NextSplit()
             side_view.Buf:GetActiveCursor():GotoLoc(buffer.Loc(0, -1))
         end
 
         side_view.Cursor:Relocate()
-        side_view:Center()
         side_view.Cursor:SelectLine()
     end
 end
 
 function onCursorUp(_)
-	arrowKeyCommands('up')
+	arrowKeyCommands()
 end
 
 function onCursorDown(_)
-	arrowKeyCommands('down')
+	arrowKeyCommands()
 end
 
 function preQuit()

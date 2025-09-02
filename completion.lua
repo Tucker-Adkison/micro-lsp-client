@@ -50,7 +50,7 @@ function Completion:displayText(side_view)
 
         local width = micro.CurPane():GetView().Width
         if filter_text ~= nil and detail ~= nil then
-            local padding = repeatStr(" ", width - string.len(filter_text) - string.len(detail))
+            local padding = repeatStr(" ", width - string.len(filter_text) - string.len(detail) - 1)
             table.insert(text_to_display, filter_text .. padding .. detail .. "\n")
         elseif filter_text ~= nil then
             local padding = repeatStr(" ", width - string.len(filter_text))
