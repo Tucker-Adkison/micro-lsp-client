@@ -1,0 +1,75 @@
+name: Build LSP Client Package
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build LSP client
+        run: |
+          cd scripts
+          mkdir -p dist
+          npx esbuild ../src/index.js --bundle --platform=node --outfile=dist/app.js
+          echo '{ "main": "dist/app.js", "output": "sea-prep.blob" }' > sea-config.json
+          node --experimental-sea-config sea-config.json
+          EXECUTABLE_NAME="lsp_client"
+          cp $(command -v node) $EXECUTABLE_NAME
+          chmod +w $EXECUTABLE_NAME
+          npx postject $EXECUTABLE_NAME NODE_SEA_BLOB sea-prep.blob \
+            --sentinel-fuse NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2
+          mv lsp_client ../lsp_client
+          rm -rf dist sea-config.json sea-prep.blob
+
+      - name: Create zip package
+        run: zip -R lspClient.zip '*.lua' 'lsp_client' 'repo.json' 'help/*'
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lspClient-package
+          path: lspClient.zip
+
+      - name: Get latest release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: latest_release
+        run: |
+          latest=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | jq -r '.tag_name // "0.1.0"')
+          echo "Latest release: $latest"
+          # Extract version parts (major.minor.patch)
+          IFS='.' read -r major minor patch <<< "$latest"
+          # Increment patch version
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          echo "New version: $new_version"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.latest_release.outputs.version }}
+          name: ${{ steps.latest_release.outputs.version }}
+          files: lspClient.zip
+          generate_release_notes: true
