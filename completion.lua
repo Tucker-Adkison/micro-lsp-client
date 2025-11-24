@@ -53,7 +53,7 @@ function Completion:displayText(side_view)
             local padding = repeatStr(" ", width - string.len(filter_text) - string.len(detail) - 1)
             table.insert(text_to_display, filter_text .. padding .. detail .. "\n")
         elseif filter_text ~= nil then
-            local padding = repeatStr(" ", width - string.len(filter_text))
+            local padding = repeatStr(" ", width - string.len(filter_text) - 1)
             table.insert(text_to_display, filter_text .. padding .. "\n")
         end
     end
@@ -66,37 +66,72 @@ end
 
 function Completion:autoComplete()
     local item = self.items[micro.CurPane().Buf:GetActiveCursor().Y + 1]
-
-    if item ~= nil and item['textEdit'] ~= nil then
-        local text_edit = item['textEdit']
-        local range = text_edit['range']
-        local range_start = range['start']
-        local range_end= range['end']
-
-        micro.Log('New text before cleaning ', text_edit['newText'])
-
-        local new_text =  string.gsub(text_edit['newText'], "%${%d+:[^}]-}", "")
-        local start_loc = buffer.Loc(range_start['character'], range_start['line'])
-        local end_loc = buffer.Loc(range_end['character'], range_end['line'])
-
-        micro.CurPane():NextSplit()
-
-        local cur_pane = micro.CurPane()
-
-        cur_pane.Buf.EventHandler:Remove(start_loc, end_loc)
-        cur_pane.Buf.EventHandler:Insert(start_loc, new_text)
-        
-        -- Position cursor at the end of inserted text
-        local cursor_pos = buffer.Loc(range_start['character'] + string.len(new_text), range_start['line'])
-        if (string.sub(new_text, -2, -1) == "()") then
-            cursor_pos = buffer.Loc(range_start['character'] + string.len(new_text) - 1, range_start['line'])
-        end
-        cur_pane.Cursor:GotoLoc(cursor_pos)
-
-        return true
+    
+    if item == nil or item['textEdit'] == nil then
+        return false
     end
+    
+    local text_edit = item['textEdit']
+    local range = text_edit['range']
+    local range_start = range['start']
+    local range_end = range['end']
+    
+    micro.Log('New text before cleaning: ', text_edit['newText'])
+    
+    local original_text = text_edit['newText']
+    
+    local new_text = string.gsub(original_text, "%$%{%d+:?[^}]*%}", "")
+    new_text = string.gsub(new_text, "%$%d+", "")
+    
+    local start_loc = buffer.Loc(range_start['character'], range_start['line'])
+    local end_loc = buffer.Loc(range_end['character'], range_end['line'])
+    
+    micro.CurPane():NextSplit()
+    local cur_pane = micro.CurPane()
+    cur_pane.Buf.EventHandler:Remove(start_loc, end_loc)
+    cur_pane.Buf.EventHandler:Insert(start_loc, new_text)
+    
+    local cursor_pos = self:findCursorPosition(original_text, new_text, range_start['character'], range_start['line'])
+    cur_pane.Cursor:GotoLoc(cursor_pos)
+    
+    return true
+end
 
-    return false
+function Completion:findCursorPosition(original_text, cleaned_text, base_char, base_line)
+    local zero_pos = string.find(original_text, "%$0")
+    if zero_pos then
+        local prefix = string.sub(original_text, 1, zero_pos - 1)
+        local cleaned_prefix = string.gsub(prefix, "%$%{%d+:?[^}]*%}", "")
+        cleaned_prefix = string.gsub(cleaned_prefix, "%$%d+", "")
+        return buffer.Loc(base_char + string.len(cleaned_prefix), base_line)
+    end
+    
+    local match_start, match_end = string.find(original_text, "%$%{0:?[^}]*%}")
+    if match_start then
+        local prefix = string.sub(original_text, 1, match_start - 1)
+        local cleaned_prefix = string.gsub(prefix, "%$%{%d+:?[^}]*%}", "")
+        cleaned_prefix = string.gsub(cleaned_prefix, "%$%d+", "")
+        return buffer.Loc(base_char + string.len(cleaned_prefix), base_line)
+    end
+    
+    if string.len(cleaned_text) >= 2 then
+        local last_two = string.sub(cleaned_text, -2)
+        local pairs = {
+            ["()"] = true,
+            ["[]"] = true,
+            ["{}"] = true,
+            ["<>"] = true,
+            ["''"] = true,
+            ['""'] = true,
+            ["``"] = true
+        }
+        
+        if pairs[last_two] then
+            return buffer.Loc(base_char + string.len(cleaned_text) - 1, base_line)
+        end
+    end
+    
+    return buffer.Loc(base_char + string.len(cleaned_text), base_line)
 end
 
 return Completion

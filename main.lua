@@ -15,6 +15,8 @@ local lsps = {}
 local enabled = false
 local Completion = require 'completion'
 local completion = Completion.new()
+local Logger = require 'logger'
+local logger = Logger.new()
 
 local server = require 'server'
 local lsp = require 'lsp'
@@ -117,15 +119,19 @@ end
 
 local onStdout = function(output_string)
     micro.Log('Command', command)
-    if command == 'completion' then
-        Completion:fromJson(output_string)
+    for outputs in output_string:gmatch("[^\r\n]+") do
+        if not Logger:fromJson(outputs) then 
+            if command == 'completion' then
+                Completion:fromJson(outputs)
 
-        if next(completion.items) == nil then
-            closeDropdownMenu()
-        else
-            openDropdownMenu()
+                if next(completion.items) == nil then
+                    closeDropdownMenu()
+                else
+                    openDropdownMenu()
 
-            Completion:displayText(side_view)
+                    Completion:displayText(side_view)
+                end
+            end
         end
     end
 end

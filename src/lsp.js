@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { getInitializeParams } from "./params.js";
 import { convertpathToUri } from "./utils.js";
 import { Logger } from "./logger.js";
+import { getLspArgs } from "./lsp_args.js";
 
 export class Lsp {
   constructor() {
@@ -11,7 +12,7 @@ export class Lsp {
     this.child = null;
     this.filePath = "";
     this.response = "";
-    this.logger = new Logger();
+    this.logger = new Logger(process.stdout);
 
     process.on("exit", (code) => {
       this.logger.error("Exited with code: " + code);
@@ -81,10 +82,13 @@ export class Lsp {
 
     let bodyJson = {
       jsonrpc: "2.0",
-      id: id,
       method: method,
       params: params,
     };
+
+    if (id !== null) {
+      bodyJson.id = id;
+    }
 
     let body = JSON.stringify(bodyJson);
     let content = `Content-Length: ${body.length}\r\n\r\n${body}`;
@@ -123,7 +127,9 @@ export class Lsp {
             (jsonResponse !== undefined && jsonResponse.result !== undefined) ||
             jsonResponse.result !== null
           ) {
-            process.stdout.write(JSON.stringify(jsonResponse.result.items));
+            process.stdout.write(
+              JSON.stringify(jsonResponse.result.items) + "\n"
+            );
 
             this.response = "";
             this.logger.info(
@@ -133,7 +139,7 @@ export class Lsp {
               `Sent output to stdout for command: ${this.command}`
             );
           } else {
-            process.stdout.write(JSON.stringify({}));
+            process.stdout.write(JSON.stringify({}) + "\n");
           }
         }
       }
@@ -143,7 +149,7 @@ export class Lsp {
   }
 
   didChange(filePath, fileText) {
-    this.sendRequest(this.id, "textDocument/didChange", {
+    this.sendRequest(null, "textDocument/didChange", {
       textDocument: {
         uri: convertpathToUri(filePath),
         version: this.version,
@@ -153,11 +159,10 @@ export class Lsp {
 
     this.filePath = filePath;
     this.version++;
-    this.id++;
   }
 
   didOpen(filePath, fileText, languageId) {
-    this.sendRequest(this.id, "textDocument/didOpen", {
+    this.sendRequest(null, "textDocument/didOpen", {
       textDocument: {
         uri: convertpathToUri(filePath),
         languageId: languageId,
@@ -168,7 +173,6 @@ export class Lsp {
 
     this.filePath = fp;
     this.version++;
-    this.id++;
   }
 
   completion(line, character) {
@@ -200,12 +204,7 @@ export class Lsp {
   }
 
   initialize(lsp, rootUri) {
-    const args = [];
-
-    if (lsp === "jdtls") {
-      args.push("-data", rootUri);
-    }
-
+    const args = getLspArgs(lsp, rootUri);
     this.logger.info(`Starting lsp: ${lsp} with args: ${args}`);
 
     this.child = spawn(lsp, args);
@@ -216,6 +215,7 @@ export class Lsp {
 
     const params = getInitializeParams(rootUri, this.child);
 
+    this.logger.info(`initialize ${JSON.stringify(params)}`);
     this.sendRequest("", "initialize", params);
     this.sendRequest("", "initialized", {});
   }

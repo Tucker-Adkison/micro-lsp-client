@@ -26,6 +26,7 @@ local function initialize(server, lsp)
     local wd, _ = go_os.Getwd()
 
     micro.Log("initialized called")
+    micro.Log("initialize " .. fmt.Sprintf('{"lsp":"%s", "rootUri":"%s"}', lsp, wd))
 
     server.sendMessage('initialize', fmt.Sprintf('{"lsp":"%s", "rootUri":"%s"}', lsp, wd))
 end

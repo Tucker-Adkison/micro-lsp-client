@@ -1,6 +1,10 @@
-import { convertpathToUri } from './utils.js'
+import { convertpathToUri } from "./utils.js";
 
-export const getInitializeParams = (projectPath, lsProcess, workspaceFolders) => {
+export const getInitializeParams = (
+  projectPath,
+  lsProcess,
+  workspaceFolders
+) => {
   let rootUri = convertpathToUri(projectPath);
   return {
     processId: lsProcess.pid !== undefined ? lsProcess.pid : null,
@@ -95,5 +99,5 @@ export const getInitializeParams = (projectPath, lsProcess, workspaceFolders) =>
       },
       experimental: {},
     },
-  }
-}
+  };
+};
