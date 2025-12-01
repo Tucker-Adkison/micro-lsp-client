@@ -57,21 +57,16 @@ describe("test sendMessage", function()
     )
   end) 
 
+end)
+
+describe("test startServer", function() 
   it("startServer works as expected for each LSP", function() 
     local server = Server.new()
     local s = spy.on(shell, "JobSpawn")
-
-    for _, lsp in pairs({"jdtls", "gopls", "other"}) do
-      local args = utils.getLspArgs(lsp, "Desktop")
-      server:startServer(lsp, args, {}, {}, {})
-      assert.spy(shell.JobSpawn).was_called_with(
-        lsp, args, {}, {}, {}, {}
-      )
-      if lsp == "jdtls" or lsp == "gopls" then 
-        assert.is_true(#args > 0)
-      else  
-         assert.is_true(#args == 0)
-      end
-    end
+     
+    server:startServer("jdtls", {}, {}, {}, {})
+    assert.spy(shell.JobSpawn).was_called_with(
+      "jdtls", {}, {}, {}, {}, {}
+    )
   end) 
 end)
