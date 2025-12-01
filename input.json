@@ -1,7 +1,0 @@
-{"method": "completion", "params": {"line": 5,"character": 2}}
-{"method": "definition", "params": {"line": 5,"character": 6}}
-{"method": "didChange", "params": {"filePath": "/Users/tadkison/Desktop/test.go","fileText":"package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Print(\"Hello, world.\")\n\t\n}\n","languageId": "go"}}
-{"method": "didOpen", "params": {"filePath": "/Users/tadkison/Desktop/test.go","fileText":"package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Print(\"Hello, world.\")\n\t\n}\n","languageId": "go","version":1}}
-{"method": "initialize", "params": {"lsp": "gopls", "rootUri": "/Users/tadkison/Desktop/"}}
-{"method": "completion", "params": {"line": 6,"character": 5}}
-

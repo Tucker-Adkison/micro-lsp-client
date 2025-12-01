@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/tuckeroa/micro-lsp-client/branch/main/graph/badge.svg)](https://codecov.io/gh/tuckeroa/micro-lsp-client)
+
 # LSP Plugin for Micro Text Editor
 
 A Language Server Protocol (LSP) client plugin for the [micro text editor](https://micro-editor.github.io/) that provides intelligent code completion and language features.

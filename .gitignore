@@ -90,6 +90,6 @@ lerna-debug.log
 .DS_Store
 Thumbs.db
 .vscode
-
-lsp_client
-lspClient.zip
+.luacov 
+luacov.stats.out
+luacov.report.html

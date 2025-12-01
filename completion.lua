@@ -4,10 +4,14 @@ local go_os = import("os")
 local home, _ = go_os.UserHomeDir()
 local pluginPath = home .. '/.config/micro/plug/lspClient/'
 package.path = package.path .. ";" .. pluginPath .. "?.lua"
-local json = require"json"
+local json = require "json"
+local utils = require "utils"
 
 local Completion = {
-    items = {}
+    completions = {},
+    id = 0,
+    didHaveCompletions = false,
+    jsonBuffer = ""
 }
 Completion.__index = Completion
 
@@ -15,19 +19,61 @@ function Completion.new()
     return setmetatable({}, Completion)
 end
 
-function Completion:fromJson(output_string)
-    self.items = {}
-    local status, output = pcall(json.decode, output_string)
+function Completion:fromJson(outputString)
+    self.completions = {}
+    self.jsonBuffer = self.jsonBuffer .. outputString 
+    self.didHaveCompletions = false
 
-    if status and next(output) ~= nil then
-        for k, v in pairs(output) do
-            self.items[k] = v
+    local contentLength = self.jsonBuffer:match("Content%-Length:%s*(%d+)")
+    if not contentLength then 
+        return 
+    end
+
+    contentLength = tonumber(contentLength)
+    local jsonStart = self.jsonBuffer:find("\r\n\r\n")
+
+    local jsonBody = self.jsonBuffer:sub(jsonStart + 4)
+    if #jsonBody < contentLength then
+        micro.Log(string.format("Buffering: have %d bytes, need %d", #jsonBody, contentLength))
+        return
+    end
+    micro.Log(string.format("Found %d bytes out of %d bytes", #jsonBody, contentLength))
+
+    local response = utils.parseMessage(self.jsonBuffer)
+    
+    if response and response.result and response.result.items then 
+        local items = response.result.items 
+
+        if #items == 0 then 
+            self.didHaveCompletions = false
+            return 
         end
 
-        micro.Log("Parsed completion response successfully")
-    else
-        micro.Log("Malformed json when calling completion")
+        self.didHaveCompletions = true
+
+        for _, item in ipairs(items) do
+            table.insert(self.completions, {
+                label = item.label,              -- Display text: "•printf(const char *restrict, ...)"
+                insertText = item.insertText,    -- Text to insert: "printf(${1:const char *restrict, ...})"
+                detail = item.detail,            -- Type info: "int"
+                documentation = item.documentation and item.documentation.value,  -- "From <stdio.h>"
+                kind = item.kind,                -- 3 = Function
+                sortText = item.sortText,        -- For ordering
+                textEdit = item.textEdit         -- Range to replace
+            })
+        end
+
+        -- Then sort by sortText (or label if sortText is missing)
+        table.sort(self.completions, function(a, b)
+            local sortA = a.sortText or a.label
+            local sortB = b.sortText or b.label
+            return sortA < sortB
+        end)
+
+        -- micro.Log("Completions", self.completions)
     end
+
+    self.jsonBuffer = ""
 end
 
 local function repeatStr(str, len)
@@ -41,81 +87,77 @@ local function repeatStr(str, len)
 	return table.concat(string_table)
 end
 
-function Completion:displayText(side_view)
-    local text_to_display = {}
+function Completion:displayText(sideView)
+    local textToDisplay = {}
 
-    for k, v in pairs(self.items) do
-        local filter_text = v['filterText']
-        local detail = v['detail']
+    for _, comp in ipairs(self.completions) do
+        local label = comp.label
+        local detail = comp.detail
 
         local width = micro.CurPane():GetView().Width
-        if filter_text ~= nil and detail ~= nil then
-            local padding = repeatStr(" ", width - string.len(filter_text) - string.len(detail) - 1)
-            table.insert(text_to_display, filter_text .. padding .. detail .. "\n")
-        elseif filter_text ~= nil then
-            local padding = repeatStr(" ", width - string.len(filter_text) - 1)
-            table.insert(text_to_display, filter_text .. padding .. "\n")
+
+        if label and detail then
+            local label = comp.label:gsub("^•", "") 
+            local padding = repeatStr(" ", width - string.len(label) - string.len(detail) - 1)
+            table.insert(textToDisplay, label .. padding .. detail .. "\n")
+        elseif label then
+            local padding = repeatStr(" ", width - string.len(label) - 1)
+            table.insert(textToDisplay, label .. padding .. "\n")
         end
     end
 
-    side_view.Buf.EventHandler:Remove(side_view.Buf:Start(), side_view.Buf:End())
-    for k, v in pairs(text_to_display) do
-        side_view.Buf.EventHandler:Insert(buffer.Loc(0, k - 1), v)
+    sideView.Buf.EventHandler:Remove(sideView.Buf:Start(), sideView.Buf:End())
+    for k, v in pairs(textToDisplay) do
+        sideView.Buf.EventHandler:Insert(buffer.Loc(0, k - 1), v)
     end
 end
 
 function Completion:autoComplete()
-    local item = self.items[micro.CurPane().Buf:GetActiveCursor().Y + 1]
-    
-    if item == nil or item['textEdit'] == nil then
+    local item = self.completions[micro.CurPane().Buf:GetActiveCursor().Y + 1]
+
+    if item == nil then
         return false
     end
     
-    local text_edit = item['textEdit']
-    local range = text_edit['range']
-    local range_start = range['start']
-    local range_end = range['end']
+    local textEdit = item['textEdit']
+    local range = textEdit['range']
+    local rangeStart = range['start']
+    local rangeEnd = range['end']
     
-    micro.Log('New text before cleaning: ', text_edit['newText'])
+    micro.Log('New text before cleaning: ', textEdit['newText'])
     
-    local original_text = text_edit['newText']
+    local originalText = textEdit['newText']
     
-    local new_text = string.gsub(original_text, "%$%{%d+:?[^}]*%}", "")
-    new_text = string.gsub(new_text, "%$%d+", "")
+    local newText = string.gsub(originalText, "%$%{%d+:?[^}]*%}", "")
+    newText = string.gsub(newText, "%$%d+", "")
+
+    micro.Log('New text after cleaning: ', newText)
     
-    local start_loc = buffer.Loc(range_start['character'], range_start['line'])
-    local end_loc = buffer.Loc(range_end['character'], range_end['line'])
+    local startLoc = buffer.Loc(rangeStart['character'], rangeStart['line'])
+    local endLoc = buffer.Loc(rangeEnd['character'], rangeEnd['line'])
     
     micro.CurPane():NextSplit()
-    local cur_pane = micro.CurPane()
-    cur_pane.Buf.EventHandler:Remove(start_loc, end_loc)
-    cur_pane.Buf.EventHandler:Insert(start_loc, new_text)
+    local curPane = micro.CurPane()
+    curPane.Buf.EventHandler:Remove(startLoc, endLoc)
+    curPane.Buf.EventHandler:Insert(startLoc, newText)
     
-    local cursor_pos = self:findCursorPosition(original_text, new_text, range_start['character'], range_start['line'])
-    cur_pane.Cursor:GotoLoc(cursor_pos)
+    local cursor_pos = self:findCursorPosition(originalText, newText, rangeStart['character'], rangeStart['line'])
+    curPane.Cursor:GotoLoc(cursor_pos)
     
     return true
 end
 
-function Completion:findCursorPosition(original_text, cleaned_text, base_char, base_line)
-    local zero_pos = string.find(original_text, "%$0")
-    if zero_pos then
-        local prefix = string.sub(original_text, 1, zero_pos - 1)
-        local cleaned_prefix = string.gsub(prefix, "%$%{%d+:?[^}]*%}", "")
-        cleaned_prefix = string.gsub(cleaned_prefix, "%$%d+", "")
-        return buffer.Loc(base_char + string.len(cleaned_prefix), base_line)
+function Completion:findCursorPosition(originalText, cleanedText, baseChar, baseLine)
+    local matchStart, matchEnd = string.find(originalText, "%$%{%d:?[^}]*%}")
+    if matchStart then
+        local prefix = string.sub(originalText, 1, matchStart - 1)
+        local cleanedPrefix = string.gsub(prefix, "%$%{%d+:?[^}]*%}", "")
+        cleanedPrefix = string.gsub(cleanedPrefix, "%$%d+", "")
+        return buffer.Loc(baseChar + string.len(cleanedPrefix), baseLine)
     end
     
-    local match_start, match_end = string.find(original_text, "%$%{0:?[^}]*%}")
-    if match_start then
-        local prefix = string.sub(original_text, 1, match_start - 1)
-        local cleaned_prefix = string.gsub(prefix, "%$%{%d+:?[^}]*%}", "")
-        cleaned_prefix = string.gsub(cleaned_prefix, "%$%d+", "")
-        return buffer.Loc(base_char + string.len(cleaned_prefix), base_line)
-    end
-    
-    if string.len(cleaned_text) >= 2 then
-        local last_two = string.sub(cleaned_text, -2)
+    if string.len(cleanedText) >= 2 then
+        local lastTwo = string.sub(cleanedText, -2)
         local pairs = {
             ["()"] = true,
             ["[]"] = true,
@@ -126,12 +168,12 @@ function Completion:findCursorPosition(original_text, cleaned_text, base_char, b
             ["``"] = true
         }
         
-        if pairs[last_two] then
-            return buffer.Loc(base_char + string.len(cleaned_text) - 1, base_line)
+        if pairs[lastTwo] then
+            return buffer.Loc(baseChar + string.len(cleanedText) - 1, baseLine)
         end
     end
     
-    return buffer.Loc(base_char + string.len(cleaned_text), base_line)
+    return buffer.Loc(baseChar + string.len(cleanedText), baseLine)
 end
 
 return Completion

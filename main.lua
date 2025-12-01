@@ -1,6 +1,6 @@
 local go_os = import("os")
 local home, _ = go_os.UserHomeDir()
-local pluginPath = home .. '/.config/micro/plug/lspClient/'
+local pluginPath = home .. "/.config/micro/plug/lspClient/"
 package.path = package.path .. ";" .. pluginPath .. "?.lua"
 
 local micro = import("micro")
@@ -8,18 +8,23 @@ local config = import("micro/config")
 local util = import("micro/util")
 local buffer = import("micro/buffer")
 
-local command = ''
-local side_view = nil
+local sideView = nil
 local settings = nil
 local lsps = {}
-local enabled = false
-local Completion = require 'completion'
-local completion = Completion.new()
-local Logger = require 'logger'
-local logger = Logger.new()
+local utils = require 'utils'
+local pid = nil
+local lspInitialized = false
+local didOpen = false
 
-local server = require 'server'
-local lsp = require 'lsp'
+-- initializing all of our classes 
+local Completion = require "completion"
+local completion = Completion.new()
+-- local Logger = require 'logger'
+-- local logger = Logger.new()
+local Server = require "server"
+local server = Server.new()
+local Lsp = require "lsp"
+local lsp = Lsp.new(server)
 
 local mysplit = function(inputstr, sep)
     if sep == nil then
@@ -33,38 +38,38 @@ local mysplit = function(inputstr, sep)
 end
 
 local openDropdownMenu = function()
-    if side_view == nil then
+    if sideView == nil then
         micro.CurPane():HSplitIndex(buffer.NewBuffer("", "dropdownMenu"), true)
 
-        side_view = micro.CurPane()
-        side_view.Buf.Type.Scratch = true
-        side_view.Buf.Type.Readonly = true
-        side_view.Buf:SetOptionNative("ruler", false)
-        side_view.Buf:SetOptionNative("autosave", false)
-        side_view.Buf:SetOptionNative("statusformatr", "")
-        side_view.Buf:SetOptionNative("statusformatl", "filemanager")
-        side_view.Buf:SetOptionNative("scrollbar", false)
+        sideView = micro.CurPane()
+        sideView.Buf.Type.Scratch = true
+        sideView.Buf.Type.Readonly = true
+        sideView.Buf:SetOptionNative("ruler", false)
+        sideView.Buf:SetOptionNative("autosave", false)
+        sideView.Buf:SetOptionNative("statusformatr", "")
+        sideView.Buf:SetOptionNative("statusformatl", "filemanager")
+        sideView.Buf:SetOptionNative("scrollbar", false)
 
         micro.CurPane():NextSplit()
     end
 end
 
 local closeDropdownMenu = function()
-	if side_view ~= nil then
-		side_view:Quit()
-		side_view = nil
+	if sideView ~= nil then
+		sideView:Quit()
+		sideView = nil
 	end
 end
 
 local arrowKeyCommands = function()
-    if side_view ~= nil then
-        if micro.CurPane() ~= side_view then
+    if sideView ~= nil then
+        if micro.CurPane() ~= sideView then
             micro.CurPane():NextSplit()
-            side_view.Buf:GetActiveCursor():GotoLoc(buffer.Loc(0, -1))
+            sideView.Buf:GetActiveCursor():GotoLoc(buffer.Loc(0, -1))
         end
 
-        side_view.Cursor:Relocate()
-        side_view.Cursor:SelectLine()
+        sideView.Cursor:Relocate()
+        sideView.Cursor:SelectLine()
     end
 end
 
@@ -79,14 +84,15 @@ end
 function preQuit()
     closeDropdownMenu()
 
-    if server ~= nil then
-        lsp.shutdown(server)
+    --TODO remove this iff
+    if server.server ~= nil then
+        lsp:shutdown(server)
     end
 end
 
 function preInsertNewline()
-    if side_view ~= nil and side_view == micro.CurPane() then
-        if Completion:autoComplete() then
+    if sideView ~= nil and sideView == micro.CurPane() then
+        if completion:autoComplete() then
             closeDropdownMenu()
         end
     end
@@ -96,68 +102,96 @@ function preinit()
     config.RegisterCommonOption("lsp", "server",'')
     settings = config.GetGlobalOption("lsp.server")
 
+    micro.Log(settings)
+
     local fileAndLsps = mysplit(settings, ',')
     for _, fileAndLsp in pairs(fileAndLsps) do
         local fileLspSplit = mysplit(fileAndLsp, '=')
         lsps[fileLspSplit[1]] = fileLspSplit[2]
     end
+
+    micro.Log(lsps)
 end
 
 function onRune(bp, _)
-    if enabled == true then
-        command = 'didChange'
-        lsp.didChange(server, bp)
+    if not lspInitialized then
+        lspInitialized = true
+        lsp:initialize()
+    end
 
-        command = 'completion'
-        lsp.completion(server, bp)
+    if lspInitialized then
+        if not didOpen then 
+            lsp:didOpen(bp)
+            
+            didOpen = true
+        end
 
-        if (micro.CurPane() == side_view) then
+        lsp:didChange(bp)
+
+        completion.id = lsp:completion(bp)
+
+        if (micro.CurPane() == sideView) then
             micro.CurPane():NextSplit()
         end
     end
 end
 
-local onStdout = function(output_string)
-    micro.Log('Command', command)
-    for outputs in output_string:gmatch("[^\r\n]+") do
-        if not Logger:fromJson(outputs) then 
-            if command == 'completion' then
-                Completion:fromJson(outputs)
+local completionRequestId = nil
 
-                if next(completion.items) == nil then
-                    closeDropdownMenu()
-                else
-                    openDropdownMenu()
+local onStdout = function(output)
+    micro.Log("Stdout", output)
+    
+    -- Filter notifications
+    if output:find('"method":') then
+        micro.Log("Ignoring LSP notification")
+        return
+    end
 
-                    Completion:displayText(side_view)
-                end
-            end
+    local responseId = output:match('"id"%s*:%s*(%d+)')
+    micro.Log("responseId", responseId, completion.id)
+    if responseId then
+        responseId = tonumber(responseId)
+        -- Only process if it matches our completion request ID
+        if responseId ~= completion.id then
+            return
         end
+    end
+    
+    completion:fromJson(output)
+    
+    if completion.didHaveCompletions then
+        openDropdownMenu()
+        completion:displayText(sideView)
+        command = ""
+    elseif completion.jsonBuffer == "" then
+        closeDropdownMenu()
     end
 end
 
 local onStderr = function(output)
-    micro.Log("Stderr", output)
+    -- micro.Log("Stderr", output)
+
+    -- local startIndex, endIndex = string.find(output, "PID")
+    -- if startIndex then 
+    --     pid = output:match("PID:%s*(%d+)")
+    -- end
+    
+    
 end
 
-local onExit = function()
-    micro.Log("Exit")
+local onExit = function(output)
+    micro.Log("Exit", output)
 end
 
 function onBufferOpen(buf)
     local fileType = buf:FileType()
+    local lspClient = lsps[fileType]
 
-    if lsps[fileType] ~= nil and not server.server then
-        enabled = true
+    if lspClient ~= nil and not server:getServer() then
+        local wd, _ = go_os.Getwd()
+        local args = utils.getLspArgs(lspClient, wd)
 
-        server.startServer(onStdout, onStderr, onExit)
-
-        local fileText = util.String(buf:Bytes()):gsub("\\", "\\\\"):gsub("\n", "\\n"):gsub("\r", "\\r"):gsub('"', '\\"'):gsub("\t", "\\t")
-
-        command = 'initialize'
-        lsp.initialize(server, lsps[fileType])
-
-        command = 'didOpen'
-        lsp.didOpen(server, buf, fileText)
+        server:startServer(lspClient, args, onStdout, onStderr, onExit)
     end
 end
+
