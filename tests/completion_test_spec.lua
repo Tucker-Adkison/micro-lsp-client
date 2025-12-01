@@ -110,7 +110,27 @@ describe("test autcomplete", function()
     completion:fromJson("Content-Length: 613\r\n\r\n{\"id\":6,\"jsonrpc\":\"2.0\",\"result\":{\"isIncomplete\":false,\"items\":[{\"additionalTextEdits\":[{\"newText\":\"#include<stdio.h>\\n\",\"range\":{\"end\":{\"character\":0,\"line\":1},\"start\":{\"character\":0,\"line\":1}}}],\"detail\":\"int\",\"documentation\":{\"kind\":\"plaintext\",\"value\":\"From<stdio.h>\"},\"filterText\":\"printf\",\"insertText\":\"printf(${1:constchar*restrict,...})\",\"insertTextFormat\":2,\"kind\":3,\"label\":\"•printf(constchar*restrict,...)\",\"score\":1.3475996255874634,\"sortText\":\"3fd381dbprintf\",\"textEdit\":{\"newText\":\"printf(${1:constchar*restrict,...})\",\"range\":{\"end\":{\"character\":7,\"line\":3},\"start\":{\"character\":1,\"line\":3}}}}]}}")
   
     assert.is_true(completion:autoComplete())
-    assert.spy(completion.findCursorPosition).was.called_with(completion, "printf(${1:constchar*restrict,...})", "printf()", 1, 3)
+    assert.spy(completion.findCursorPosition).was_called_with(completion, "printf(${1:constchar*restrict,...})", "printf()", 1, 3)
+  end)
+
+  it("autocomplete findCursorPosition worked when regex did not match", function() 
+    local completion = Completion.new()
+    local s = spy.on(completion, "findCursorPosition")
+
+    completion:fromJson("Content-Length: 1237\r\n\r\n{\"id\":10,\"jsonrpc\":\"2.0\",\"result\":{\"isIncomplete\":false,\"items\":[{\"filterText\":\"include\",\"insertText\":\"include\\\"$0\\\"\",\"insertTextFormat\":2,\"kind\":15,\"label\":\"include\\\"header\\\"\",\"score\":0.78725427389144897,\"sortText\":\"40367681include\",\"textEdit\":{\"newText\":\"include\\\"$0\\\"\",\"range\":{\"end\":{\"character\":8,\"line\":0},\"start\":{\"character\":1,\"line\":0}}}},{\"filterText\":\"include\",\"insertText\":\"include<$0>\",\"insertTextFormat\":2,\"kind\":15,\"label\":\"include<header>\",\"score\":0.78725427389144897,\"sortText\":\"40367681include\",\"textEdit\":{\"newText\":\"include<$0>\",\"range\":{\"end\":{\"character\":8,\"line\":0},\"start\":{\"character\":1,\"line\":0}}}},{\"filterText\":\"include_next\",\"insertText\":\"include_next<$0>\",\"insertTextFormat\":2,\"kind\":15,\"label\":\"include_next<header>\",\"score\":0.78725427389144897,\"sortText\":\"40b67681include_next\",\"textEdit\":{\"newText\":\"include_next<$0>\",\"range\":{\"end\":{\"character\":8,\"line\":0},\"start\":{\"character\":1,\"line\":0}}}},{\"filterText\":\"include_next\",\"insertText\":\"include_next\\\"$0\\\"\",\"insertTextFormat\":2,\"kind\":15,\"label\":\"include_next\\\"header\\\"\",\"score\":0.78725427389144897,\"sortText\":\"40b67681include_next\",\"textEdit\":{\"newText\":\"include_next\\\"$0\\\"\",\"range\":{\"end\":{\"character\":8,\"line\":0},\"start\":{\"character\":1,\"line\":0}}}}]}}")
+  
+    assert.is_true(completion:autoComplete())
+    assert.spy(completion.findCursorPosition).was_called_with(completion, "include\"$0\"", "include\"\"", 1, 0)
+  end)
+
+  it("autocomplete findCursorPosition defaults works", function() 
+    local completion = Completion.new()
+    local s = spy.on(completion, "findCursorPosition")
+
+    completion:fromJson("Content-Length: 311\r\n\r\n{\"id\":6,\"jsonrpc\":\"2.0\",\"result\":{\"isIncomplete\":false,\"items\":[{\"filterText\":\"void\",\"insertText\":\"void\",\"insertTextFormat\":1,\"kind\":14,\"label\":\"void\",\"score\":1.3658820390701294,\"sortText\":\"3fd12ac7void\",\"textEdit\":{\"newText\":\"void\",\"range\":{\"end\":{\"character\":5,\"line\":3},\"start\":{\"character\":1,\"line\":3}}}}]}}")
+  
+    assert.is_true(completion:autoComplete())
+    assert.spy(completion.findCursorPosition).was_called_with(completion, "void", "void", 1, 3)
   end)
 
   it("autocomplete did not happen", function() 
@@ -118,7 +138,7 @@ describe("test autcomplete", function()
     local s = spy.on(completion, "findCursorPosition")
 
     assert.is_false(completion:autoComplete())
-    assert.spy(completion.findCursorPosition).was.was_not_called_with(completion, "printf(${1:constchar*restrict,...})", "printf()", 1, 3)
+    assert.spy(completion.findCursorPosition).was_not_called_with(completion, "printf(${1:constchar*restrict,...})", "printf()", 1, 3)
   end)
 end)
 
@@ -133,7 +153,7 @@ describe("test displayText", function()
     completion:fromJson("Content-Length: 613\r\n\r\n{\"id\":6,\"jsonrpc\":\"2.0\",\"result\":{\"isIncomplete\":false,\"items\":[{\"additionalTextEdits\":[{\"newText\":\"#include<stdio.h>\\n\",\"range\":{\"end\":{\"character\":0,\"line\":1},\"start\":{\"character\":0,\"line\":1}}}],\"detail\":\"int\",\"documentation\":{\"kind\":\"plaintext\",\"value\":\"From<stdio.h>\"},\"filterText\":\"printf\",\"insertText\":\"printf(${1:constchar*restrict,...})\",\"insertTextFormat\":2,\"kind\":3,\"label\":\"•printf(constchar*restrict,...)\",\"score\":1.3475996255874634,\"sortText\":\"3fd381dbprintf\",\"textEdit\":{\"newText\":\"printf(${1:constchar*restrict,...})\",\"range\":{\"end\":{\"character\":7,\"line\":3},\"start\":{\"character\":1,\"line\":3}}}}]}}")
     completion:displayText(sideView)
 
-    assert.spy(mockEventHandler.Insert).was.was_called_with(mockEventHandler, 0, "printf(constchar*restrict,...)                int\n")
+    assert.spy(mockEventHandler.Insert).was_called_with(mockEventHandler, 0, "printf(constchar*restrict,...)                int\n")
   end)
 
   it("text was displayed without details", function() 
@@ -146,6 +166,6 @@ describe("test displayText", function()
     completion:fromJson("Content-Length: 311\r\n\r\n{\"id\":6,\"jsonrpc\":\"2.0\",\"result\":{\"isIncomplete\":false,\"items\":[{\"filterText\":\"void\",\"insertText\":\"void\",\"insertTextFormat\":1,\"kind\":14,\"label\":\"void\",\"score\":1.3658820390701294,\"sortText\":\"3fd12ac7void\",\"textEdit\":{\"newText\":\"void\",\"range\":{\"end\":{\"character\":5,\"line\":3},\"start\":{\"character\":1,\"line\":3}}}}]}}")
     completion:displayText(sideView)
     
-    assert.spy(mockEventHandler.Insert).was.was_called_with(mockEventHandler, 0, "void                                             \n")
+    assert.spy(mockEventHandler.Insert).was_called_with(mockEventHandler, 0, "void                                             \n")
   end)
 end)

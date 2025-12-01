@@ -54,17 +54,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check if source files changed
+        id: check_changes
+        run: |
+          # Get list of changed files in the last commit
+          changed_files=$(git diff --name-only HEAD^ HEAD)
+          echo "Changed files:"
+          echo "$changed_files"
+
+          # Check if any non-test files were changed
+          if echo "$changed_files" | grep -qvE '^tests/|_spec\.lua$'; then
+            echo "Source files changed, proceeding with release"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "Only test files changed, skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Create zip package
+        if: steps.check_changes.outputs.should_release == 'true'
         run: zip -R lspClient.zip '*.lua' 'repo.json' 'help/*'
 
       - name: Upload zip artifact
+        if: steps.check_changes.outputs.should_release == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: lspClient-package
           path: lspClient.zip
 
       - name: Get latest release
+        if: steps.check_changes.outputs.should_release == 'true'
         id: latest_release
         run: |
           latest=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
@@ -80,6 +102,7 @@ jobs:
           echo "version=$new_version" >> $GITHUB_OUTPUT
 
       - name: Create release
+        if: steps.check_changes.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.latest_release.outputs.version }}
