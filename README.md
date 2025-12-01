@@ -1,4 +1,4 @@
-[![codecov](https://codecov.io/gh/tuckeroa/micro-lsp-client/branch/main/graph/badge.svg)](https://codecov.io/gh/tuckeroa/micro-lsp-client)
+[![codecov](https://codecov.io/github/Tucker-Adkison/micro-lsp-client/graph/badge.svg?token=MAU1JJAOKG)](https://codecov.io/github/Tucker-Adkison/micro-lsp-client)
 
 # LSP Plugin for Micro Text Editor
 
