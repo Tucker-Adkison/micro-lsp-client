@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -42,3 +45,44 @@ jobs:
         with:
           files: ./luacov.report.out
           fail_ci_if_error: false
+
+  release:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create zip package
+        run: zip -R lspClient.zip '*.lua' 'repo.json' 'help/*'
+
+      - name: Upload zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lspClient-package
+          path: lspClient.zip
+
+      - name: Get latest release
+        id: latest_release
+        run: |
+          latest=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
+            | jq -r '.tag_name // "0.1.0"')
+          echo "Latest release: $latest"
+          # Extract version parts (major.minor.patch)
+          IFS='.' read -r major minor patch <<< "$latest"
+          # Increment patch version
+          new_patch=$((patch + 1))
+          new_version="$major.$minor.$new_patch"
+          echo "New version: $new_version"
+          echo "version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.latest_release.outputs.version }}
+          name: ${{ steps.latest_release.outputs.version }}
+          files: lspClient.zip
+          generate_release_notes: true
