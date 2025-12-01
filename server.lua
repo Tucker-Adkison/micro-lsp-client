@@ -3,7 +3,6 @@ local home, _ = go_os.UserHomeDir()
 local pluginPath = home .. '/.config/micro/plug/lspClient/'
 package.path = package.path .. ";" .. pluginPath .. "?.lua"
 
-local fmt = import("fmt")
 local shell = import("micro/shell")
 local micro = import("micro")
 local json = require "json"
@@ -38,10 +37,6 @@ function Server:startServer(lsp, args, onStdout, onStderr, onExit)
     
     self.lsp = lsp
     self.server = shell.JobSpawn(lsp, args, onStdout, onStderr, onExit, {})
-end
-
-function Server:getServer() 
-    return self.server
 end
 
 return Server

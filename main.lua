@@ -168,16 +168,7 @@ local onStdout = function(output)
     end
 end
 
-local onStderr = function(output)
-    -- micro.Log("Stderr", output)
-
-    -- local startIndex, endIndex = string.find(output, "PID")
-    -- if startIndex then 
-    --     pid = output:match("PID:%s*(%d+)")
-    -- end
-    
-    
-end
+local onStderr = function(output) end
 
 local onExit = function(output)
     micro.Log("Exit", output)
@@ -187,7 +178,7 @@ function onBufferOpen(buf)
     local fileType = buf:FileType()
     local lspClient = lsps[fileType]
 
-    if lspClient ~= nil and not server:getServer() then
+    if lspClient ~= nil and not server.server then
         local wd, _ = go_os.Getwd()
         local args = utils.getLspArgs(lspClient, wd)
 

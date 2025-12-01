@@ -16,30 +16,30 @@ local mockBuf = {
 }
 
 _G.import = function(module)
-    if module == "micro" then
-      local mockPane = {
-          Buf = mockBuf,
-          Cursor = mockCursor,
-          NextSplit = function() end,
-          GetView = function() return {
-            Width = 50
-          } end
-      }
-      return {
-        Log = function(...) end,
-        CurPane = function() return mockPane end,
-      }
-    elseif module == "micro/buffer" then
-        return {
-          Loc = function(...) return 0 end
-        }
-    elseif module == "os" then
-        return {
-            UserHomeDir = function()
-                return os.getenv("HOME") or "/tmp", nil
-            end
-        }
-    end
+  if module == "micro" then
+    local mockPane = {
+        Buf = mockBuf,
+        Cursor = mockCursor,
+        NextSplit = function() end,
+        GetView = function() return {
+          Width = 50
+        } end
+    }
+    return {
+      Log = function(...) end,
+      CurPane = function() return mockPane end,
+    }
+  elseif module == "micro/buffer" then
+    return {
+      Loc = function(...) return 0 end
+    }
+  elseif module == "os" then
+    return {
+        UserHomeDir = function()
+            return os.getenv("HOME") or "/tmp", nil
+        end
+    }
+  end
 end
 
 local function parseCompletionFile(filePath)

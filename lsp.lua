@@ -3,11 +3,8 @@ local home, _ = go_os.UserHomeDir()
 local pluginPath = home .. '/.config/micro/plug/lspClient/'
 package.path = package.path .. ";" .. pluginPath .. "?.lua"
 
-local micro = import("micro")
 local fmt = import("fmt")
 local utils = require "utils"
-local json = require "json"
-local util = import("micro/util")
 
 local Lsp = {
   id = -1,
